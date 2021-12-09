@@ -103,6 +103,8 @@ var sql_CreateTable = `
         UniquePosition BLOB,
         UNIQUE(ClientID , ID)
         );
+    CREATE INDEX IF NOT EXISTS SyncEntity_Datatype_Mtime ( ClientID, DataType, Mtime);
+    CREATE INDEX IF NOT EXISTS SyncEntity_Version ( ClientID, ID , Version);
     `
 
 //for InsertSyncEntitiesWithServerTags
@@ -300,9 +302,8 @@ func (db *LiteDB) UpdateSyncEntity(entity *SyncEntity, oldVersion int64) (confli
 // GetUpdatesForType returns sync entities of a data type where it's mtime is
 // later than the client token.
 
-// we ignore maxSize!
-var sql_GetUpdatesForType_Without_Folders = `SELECT ClientID, ID, ParentID , Version,  Mtime , Ctime, Name , NonUniqueName ,  ServerDefinedUniqueTag , Deleted, OriginatorCacheGUID ,  OriginatorClientItemID , Specifics , DataType, Folder,  ClientDefinedUniqueTag , UniquePosition  FROM SyncEntity WHERE Folder = FALSE AND ClientID = ? AND DataType=? AND Mtime > ? ORDER BY Mtime ASC;`
-var sql_GetUpdatesForType = `SELECT ClientID, ID, ParentID , Version,  Mtime , Ctime, Name , NonUniqueName ,  ServerDefinedUniqueTag , Deleted, OriginatorCacheGUID ,  OriginatorClientItemID , Specifics , DataType, Folder,  ClientDefinedUniqueTag , UniquePosition  FROM SyncEntity WHERE ClientID = ? AND DataType=? AND Mtime > ? ORDER BY Mtime ASC;`
+var sql_GetUpdatesForType_Without_Folders = `SELECT ClientID, ID, ParentID , Version,  Mtime , Ctime, Name , NonUniqueName ,  ServerDefinedUniqueTag , Deleted, OriginatorCacheGUID ,  OriginatorClientItemID , Specifics , DataType, Folder,  ClientDefinedUniqueTag , UniquePosition  FROM SyncEntity WHERE Folder = FALSE AND ClientID = ? AND DataType=? AND Mtime > ? ORDER BY Mtime ASC LIMIT ? ;`
+var sql_GetUpdatesForType = `SELECT ClientID, ID, ParentID , Version,  Mtime , Ctime, Name , NonUniqueName ,  ServerDefinedUniqueTag , Deleted, OriginatorCacheGUID ,  OriginatorClientItemID , Specifics , DataType, Folder,  ClientDefinedUniqueTag , UniquePosition  FROM SyncEntity WHERE ClientID = ? AND DataType=? AND Mtime > ? ORDER BY Mtime ASC LIMIT ?;`
 
 func (db *LiteDB) GetUpdatesForType(dataType int, clientToken int64, fetchFolders bool, clientID string, maxSize int64) (bool, []SyncEntity, error) { //haschangingremain??
 	syncEntities := []SyncEntity{}
@@ -311,18 +312,20 @@ func (db *LiteDB) GetUpdatesForType(dataType int, clientToken int64, fetchFolder
 	if fetchFolders {
 		stmt = sql_GetUpdatesForType
 	}
-	rows, err := db.Query(stmt, clientID, dataType, clientToken)
+	rows, err := db.Query(stmt, clientID, dataType, clientToken, maxSize +1 ) //we take one more to check if we have remaining , but do not return it
 	if err != nil {
 		return false, nil, err
 	}
 	defer rows.Close()
 	var entity SyncEntity
-	for rows.Next() {
+    count := 0
+	for rows.Next() && count < maxSize {
 		rows.Scan(&entity.ClientID, &entity.ID, &entity.ParentID, &entity.Version, &entity.Mtime, &entity.Ctime, &entity.Name, &entity.NonUniqueName, &entity.ServerDefinedUniqueTag, &entity.Deleted, &entity.OriginatorCacheGUID, &entity.OriginatorClientItemID, &entity.Specifics, &entity.DataType, &entity.Folder, &entity.ClientDefinedUniqueTag, &entity.UniquePosition)
 		syncEntities = append(syncEntities, entity)
+        count += 1
 	}
 
-	return false, syncEntities, nil
+	return rows.Next(), syncEntities, nil
 
 }
 
