@@ -5,3 +5,12 @@ TODO
 
 Write with python
 
+
+How to use:
+
+chromium-sync-server
+
+HOW TO:
+
+GOOGLE_API_KEY=1234 GOOGLE_DEFAULT_CLIENT_ID=1234 GOOGLE_DEFAULT_CLIENT_SECRET=2345 chromium-browser --enable-logging=stderr --v=1 --gaia-url=https://127.0.0.1:5000 --sync-url=https://127.0.0.1:5000/sync-url/ --google-apis-url=https://127.0.0.1:5000/google-apis-url/ --lso-url=https://127.0.0.1:5000/lso-url/ --oauth2-client-id=1234 --oauth2-client-secret=2345
+
